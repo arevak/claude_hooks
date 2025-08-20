@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|MultiEdit|Bash|Grep|Glob|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "block-sensitive.py"
+          }
+        ]
+      }
+    ]
+  }
+}

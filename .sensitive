@@ -1,0 +1,47 @@
+# .sensitive - Define patterns for files that should be blocked by Claude Code hooks
+# This file uses gitignore-style glob patterns
+# Lines starting with # are comments and will be ignored
+
+# Default Terraform sensitive files
+terraform.tfvars
+terraform.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
+
+# Environment files (common patterns)
+.env
+.env.*
+*.env
+
+# Common secret/config files
+secrets.json
+secrets.yaml
+secrets.yml
+config/production.*
+config/prod.*
+
+# SSH and crypto keys
+*.pem
+*.key
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+*.p12
+*.pfx
+
+# Database connection files
+.pgpass
+my.cnf
+
+# Cloud provider credentials
+.aws/credentials
+.aws/config
+gcloud/credentials.json
+.azure/credentials
+
+# API keys and tokens
+*api-key*
+*api_key*
+*token*
+*secret*
