@@ -1,0 +1,13 @@
+{
+  "name": "unity-gamedev-tools",
+  "version": "1.0.0",
+  "description": "Development tools for Unity game engine projects (C#, MonoBehaviour, ScriptableObjects)",
+  "author": {
+    "name": "Unity Dev Team"
+  },
+  "license": "MIT",
+  "keywords": ["unity", "gamedev", "csharp", "monobehaviour", "game-engine"],
+  "category": "gamedev",
+  "commands": "./commands/",
+  "agents": "./agents/"
+}

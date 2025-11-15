@@ -1,0 +1,13 @@
+{
+  "name": "godot-gamedev-tools",
+  "version": "1.0.0",
+  "description": "Development tools for Godot game engine projects (GDScript, C#, scenes)",
+  "author": {
+    "name": "Game Dev Team"
+  },
+  "license": "MIT",
+  "keywords": ["godot", "gamedev", "gdscript", "unity", "game-engine"],
+  "category": "gamedev",
+  "commands": "./commands/",
+  "agents": "./agents/"
+}

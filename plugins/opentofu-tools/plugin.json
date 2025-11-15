@@ -1,0 +1,13 @@
+{
+  "name": "opentofu-tools",
+  "version": "1.0.0",
+  "description": "Development tools for OpenTofu/Terraform infrastructure as code projects",
+  "author": {
+    "name": "Infrastructure Team"
+  },
+  "license": "MIT",
+  "keywords": ["opentofu", "terraform", "iac", "infrastructure", "devops"],
+  "category": "infrastructure",
+  "commands": "./commands/",
+  "agents": "./agents/"
+}

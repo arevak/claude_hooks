@@ -1,0 +1,13 @@
+{
+  "name": "dev-essentials",
+  "version": "1.0.0",
+  "description": "Essential development tools, code review agents, and productivity commands for all programming languages",
+  "author": {
+    "name": "Dev Productivity Team"
+  },
+  "license": "MIT",
+  "keywords": ["productivity", "code-review", "refactoring", "testing", "documentation"],
+  "category": "productivity",
+  "commands": "./commands/",
+  "agents": "./agents/"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "phoenix-elixir-tools",
+  "version": "1.0.0",
+  "description": "Development tools for Phoenix Framework and Elixir/Erlang projects",
+  "author": {
+    "name": "Elixir Dev Team"
+  },
+  "license": "MIT",
+  "keywords": ["phoenix", "elixir", "erlang", "liveview", "backend"],
+  "category": "development",
+  "commands": "./commands/",
+  "agents": "./agents/"
+}

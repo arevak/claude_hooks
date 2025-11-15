@@ -24,6 +24,84 @@
       "homepage": "https://github.com/yourusername/claude_hooks",
       "repository": "https://github.com/yourusername/claude_hooks",
       "strict": true
+    },
+    {
+      "name": "dev-essentials",
+      "source": "./plugins/dev-essentials",
+      "description": "Essential development tools, code review agents, and productivity commands for all programming languages",
+      "version": "1.0.0",
+      "author": {
+        "name": "Dev Productivity Team"
+      },
+      "license": "MIT",
+      "keywords": ["productivity", "code-review", "refactoring", "testing", "documentation"],
+      "category": "productivity",
+      "strict": true
+    },
+    {
+      "name": "react-typescript-tools",
+      "source": "./plugins/react-typescript-tools",
+      "description": "Development tools and helpers for React and TypeScript projects",
+      "version": "1.0.0",
+      "author": {
+        "name": "Dev Tools Team"
+      },
+      "license": "MIT",
+      "keywords": ["react", "typescript", "frontend", "components"],
+      "category": "development",
+      "strict": true
+    },
+    {
+      "name": "phoenix-elixir-tools",
+      "source": "./plugins/phoenix-elixir-tools",
+      "description": "Development tools for Phoenix Framework and Elixir/Erlang projects",
+      "version": "1.0.0",
+      "author": {
+        "name": "Elixir Dev Team"
+      },
+      "license": "MIT",
+      "keywords": ["phoenix", "elixir", "erlang", "liveview", "backend"],
+      "category": "development",
+      "strict": true
+    },
+    {
+      "name": "godot-gamedev-tools",
+      "source": "./plugins/godot-gamedev-tools",
+      "description": "Development tools for Godot game engine projects (GDScript, C#, scenes)",
+      "version": "1.0.0",
+      "author": {
+        "name": "Game Dev Team"
+      },
+      "license": "MIT",
+      "keywords": ["godot", "gamedev", "gdscript", "unity", "game-engine"],
+      "category": "gamedev",
+      "strict": true
+    },
+    {
+      "name": "unity-gamedev-tools",
+      "source": "./plugins/unity-gamedev-tools",
+      "description": "Development tools for Unity game engine projects (C#, MonoBehaviour, ScriptableObjects)",
+      "version": "1.0.0",
+      "author": {
+        "name": "Unity Dev Team"
+      },
+      "license": "MIT",
+      "keywords": ["unity", "gamedev", "csharp", "monobehaviour", "game-engine"],
+      "category": "gamedev",
+      "strict": true
+    },
+    {
+      "name": "opentofu-tools",
+      "source": "./plugins/opentofu-tools",
+      "description": "Development tools for OpenTofu/Terraform infrastructure as code projects",
+      "version": "1.0.0",
+      "author": {
+        "name": "Infrastructure Team"
+      },
+      "license": "MIT",
+      "keywords": ["opentofu", "terraform", "iac", "infrastructure", "devops"],
+      "category": "infrastructure",
+      "strict": true
     }
   ]
 }

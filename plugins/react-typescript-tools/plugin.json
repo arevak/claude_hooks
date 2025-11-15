@@ -1,0 +1,13 @@
+{
+  "name": "react-typescript-tools",
+  "version": "1.0.0",
+  "description": "Development tools and helpers for React and TypeScript projects",
+  "author": {
+    "name": "Dev Tools Team"
+  },
+  "license": "MIT",
+  "keywords": ["react", "typescript", "frontend", "components"],
+  "category": "development",
+  "commands": "./commands/",
+  "agents": "./agents/"
+}
