@@ -1,0 +1,25 @@
+{
+  "name": "sensitive-file-blocker",
+  "version": "1.0.0",
+  "description": "Blocks Claude Code access to sensitive files using .sensitive patterns and optional .gitignore filtering",
+  "author": {
+    "name": "Security Team"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/yourusername/claude_hooks",
+  "repository": "https://github.com/yourusername/claude_hooks",
+  "keywords": ["security", "privacy", "hooks", "file-protection"],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|MultiEdit|Bash|Grep|Glob|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/block-sensitive.py"
+          }
+        ]
+      }
+    ]
+  }
+}

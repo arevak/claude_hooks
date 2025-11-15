@@ -1,0 +1,29 @@
+{
+  "name": "personal-security-tools",
+  "owner": {
+    "name": "Personal Plugin Collection",
+    "email": "plugins@example.com"
+  },
+  "metadata": {
+    "description": "Personal marketplace for Claude Code security and productivity plugins",
+    "version": "1.0.0",
+    "pluginRoot": "./plugins"
+  },
+  "plugins": [
+    {
+      "name": "sensitive-file-blocker",
+      "source": "./plugins/sensitive-file-blocker",
+      "description": "Blocks Claude Code access to sensitive files using .sensitive patterns and optional .gitignore filtering",
+      "version": "1.0.0",
+      "author": {
+        "name": "Security Team"
+      },
+      "license": "MIT",
+      "keywords": ["security", "privacy", "hooks", "file-protection"],
+      "category": "security",
+      "homepage": "https://github.com/yourusername/claude_hooks",
+      "repository": "https://github.com/yourusername/claude_hooks",
+      "strict": true
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+# Example .sensitive file
+# Add patterns for files that should be blocked from Claude Code access
+# Supports gitignore-style glob patterns
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Terraform variable files
+*.tfvars
+*.auto.tfvars
+
+# Credentials and secrets
+credentials.json
+secrets.yaml
+secrets.yml
+**/secrets/**
+**/api-keys/**
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_dsa
+id_ecdsa
+id_ed25519
+
+# Cloud provider credentials
+.aws/credentials
+.gcp/credentials.json
+.azure/credentials
+
+# Database configuration
+database.yml
+**/config/database.yml
+
+# API tokens
+.github/token
+.gitlab-token
