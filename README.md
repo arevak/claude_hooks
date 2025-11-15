@@ -7,11 +7,11 @@ A personal marketplace for Claude Code plugins covering security, productivity, 
 ### Add this marketplace to Claude Code
 
 ```bash
-# Using GitHub (replace with your username/repo)
-/plugin marketplace add yourusername/claude_hooks
+# Using GitHub
+/plugin marketplace add arevak/claudeplugins
 
 # Using Git URL
-/plugin marketplace add https://github.com/yourusername/claude_hooks.git
+/plugin marketplace add https://github.com/arevak/claudeplugins.git
 
 # Using local path (for development)
 /plugin marketplace add /path/to/claude_hooks
@@ -178,7 +178,7 @@ To automatically install this marketplace for your team, add it to `.claude/sett
     "personal-security-tools": {
       "source": {
         "source": "github",
-        "repo": "yourusername/claude_hooks"
+        "repo": "arevak/claudeplugins"
       }
     }
   },
