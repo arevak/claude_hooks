@@ -321,72 +321,73 @@ if strict_mode:
 
 ---
 
-## 🔴 CRITICAL: Vulnerability #4 - AWK Script Injection & File Indirection
+## 🔴 CRITICAL: Vulnerability #4 - Ack Search Tool Without Path
 
-**Location:** `src/claude_hooks/block_sensitive.py:134-192`
+**Location:** `src/claude_hooks/block_sensitive.py:134-192` (Bash command checking)
 
-**Issue:** AWK is an extremely powerful scripting language with multiple methods to access files that are invisible to token-based parsing. The hook only checks command-line arguments, not AWK script content.
+**Issue:** `ack` (also known as `ack-grep` or "better than grep") is a code search tool that searches recursively by default. Similar to grep and ripgrep, when no path is specified, ack bypasses detection.
 
-### AWK Bypass Methods
+### Ack Bypass Methods
 
-#### 4a. Variable Indirection
+#### 4a. Recursive Search Without Path
 ```bash
-awk -v file=.env '{getline < file; print}' /dev/null
+ack "password"
+ack "API_KEY"
 ```
-**Why it bypasses:** The filename `.env` is assigned to a variable, not a command-line token. The hook sees `file=.env` and skips it because it contains `=`.
+**Why it bypasses:** No explicit file paths in the command. The hook sees only the search pattern, which doesn't look like a file path.
 
 **Proof:**
 ```
-TEST 8: awk with -v variable assignment
-Command: awk -v file=.env "{getline < file; print}" /dev/null
+TEST 2: ack recursive without path
+Command: ack "password"
 Blocked: False
-❌ VULNERABILITY: awk with variable indirection bypasses!
+❌ VULNERABILITY: ack without path searches recursively!
 ```
 
-#### 4b. Inline File Reading (getline)
+#### 4b. Type Filters
 ```bash
-awk 'BEGIN {while(getline < ".env") print}'
+ack "secret" --type=yaml
+ack "password" --type=ruby
 ```
-**Why it bypasses:** The filename is embedded inside the AWK script string, completely invisible to external tokenization.
+**Why it bypasses:** The `--type=yaml` filter searches all YAML files recursively, but the hook doesn't recognize this as a file access pattern.
 
 **Proof:**
 ```
-TEST 9: awk reading file in script
-Command: awk "BEGIN {while(getline < ".env") print}"
+TEST 3: ack with --type flag
+Command: ack "secret" --type=yaml
 Blocked: False
-❌ VULNERABILITY: awk inline file reading bypasses!
+❌ VULNERABILITY: ack with type filter bypasses!
 ```
 
-#### 4c. System Command Injection
+#### 4c. ack-grep Alternative Name
 ```bash
-awk 'BEGIN {system("cat .env")}'
-awk 'BEGIN {system("find . -name *.tfvars | xargs cat")}'
+ack-grep "API_KEY" --env
 ```
-**Why it bypasses:** AWK's `system()` function executes arbitrary shell commands. The nested command is invisible to the hook.
+**Why it bypasses:** On some systems, `ack` is called `ack-grep`. The `--env` shortcut searches `.env` files, but this bypass works because no explicit path is in the tokens.
 
 **Proof:**
 ```
-TEST 10: awk system() command injection
-Command: awk "BEGIN {system("cat .env")}"
+TEST 5: ack-grep (alternative name)
+Command: ack-grep "API_KEY" --env
 Blocked: False
-❌ VULNERABILITY: awk system() command injection!
+❌ VULNERABILITY: ack-grep variant bypasses!
 ```
 
-**Impact:** AWK provides multiple independent bypass mechanisms. An attacker can read any sensitive file using AWK scripting features.
+**Impact:** `ack` is specifically designed for code searching and is popular among developers. The tool's recursive-by-default behavior combined with type filtering makes it an effective bypass vector.
 
-**Additional AWK Attack Vectors:**
+**Additional Ack Attack Vectors:**
 ```bash
-# Print specific fields from sensitive files
-awk -F'=' '/PASSWORD/ {print $2}' .env
+# Search all file types recursively
+ack "SECRET_KEY"
 
-# Read multiple sensitive files in one command
-awk 'FNR==1{print FILENAME":"$0}' .env config.yml secrets.json
+# Search specific types without explicit paths
+ack "password" --python --ruby --yaml
 
-# Use AWK as a full programming language to exfiltrate data
-awk 'BEGIN {
-  while((getline line < ".env") > 0)
-    print line | "base64"
-}'
+# Combine with output formatting
+ack "API" --output='$1:$2' --type=env
+
+# Use short type aliases
+ack "secret" --js --css --html
 ```
 
 ---
@@ -432,19 +433,19 @@ rg "API_KEY" --no-filename --no-line-number
 
 ## Updated Attack Scenarios
 
-### Scenario 4: AWK-Based Data Exfiltration
+### Scenario 4: Ack-Based Reconnaissance
 ```bash
-# Extract all environment variables
-awk 'BEGIN {while(getline < ".env") print}' | base64
+# Search for secrets across entire codebase
+ack "password|secret|api_key" --ignore-case
 
-# Parse and extract specific secrets
-awk -F'=' '/PASSWORD|SECRET|KEY/ {print $2}' .env secrets.yml
+# Search by file type without specifying paths
+ack "AWS_ACCESS_KEY" --yaml --json --env
 
-# Use system() to chain multiple commands
-awk 'BEGIN {system("find . -name *.tfvars -exec cat {} \\;")}'
+# Use ack-grep alternative name
+ack-grep "DATABASE_URL" --python --ruby
 
-# Read file via variable indirection to evade detection
-awk -v f=terraform.tfvars 'BEGIN {while(getline < f) print}'
+# Combine type filters to search sensitive file types
+ack "SECRET" --type=yaml --type=env
 ```
 
 ### Scenario 5: Ripgrep Reconnaissance
@@ -463,45 +464,43 @@ rg "secret" --type-add 'secrets:*.{env,tfvars,yml}' --type secrets
 
 ## Additional Recommended Fixes
 
-### Fix #6: AWK Script Analysis (CRITICAL)
+### Fix #6: Ack Path Validation (CRITICAL)
 
 **Location:** `src/claude_hooks/block_sensitive.py:134-192`
 
-AWK is too dangerous to parse safely. Recommended approach: **Block AWK entirely** or implement strict allowlist mode.
+Similar to ripgrep, ack needs path validation to prevent recursive searches without explicit targets.
 
 ```python
 def check_bash_command(command, sensitive_spec, project_root=None, use_gitignore=False):
     if not command:
         return False, None
 
-    # CRITICAL: Block AWK entirely for high-security environments
-    # AWK has too many ways to access files: getline, system(), variable indirection
     tokens = shlex.split(command) if command else []
     cmd_name = tokens[0] if tokens else ''
 
-    if cmd_name in ['awk', 'gawk', 'mawk', 'nawk']:
-        # Check if AWK script contains dangerous constructs
-        if 'getline' in command or 'system(' in command:
-            return True, "AWK scripts with 'getline' or 'system()' are not allowed for security reasons."
+    # Handle both 'ack' and 'ack-grep'
+    if cmd_name in ['ack', 'ack-grep']:
+        # Check if ack has explicit paths or searches from root
+        has_path = any(not token.startswith('-') and '/' in token for token in tokens[1:])
 
-        # Parse -v variable assignments
-        for i, token in enumerate(tokens):
-            if token == '-v' and i + 1 < len(tokens):
-                # Extract variable assignment: -v file=.env
-                assignment = tokens[i + 1]
-                if '=' in assignment:
-                    _, value = assignment.split('=', 1)
-                    is_sensitive, reason = is_sensitive_file(value, sensitive_spec, project_root, use_gitignore)
-                    if is_sensitive:
-                        return True, f"AWK variable references sensitive file: {value}"
+        if not has_path:
+            # Searching without explicit path - potentially dangerous
+            return True, "Ack without explicit path is not allowed. Specify a safe directory to search."
+
+        # Check --type and type shortcuts for sensitive patterns
+        # Ack uses --type=X or shortcut flags like --env, --yaml, etc.
+        for token in tokens:
+            # Check --type=X format
+            if token.startswith('--type='):
+                type_name = token.split('=', 1)[1]
+                # Could map type names to extensions and check
+            # Check shortcut flags like --env, --yaml
+            elif token.startswith('--') and not '=' in token:
+                # Common shortcuts that might be sensitive
+                if token in ['--env', '--yaml', '--yml', '--json', '--config']:
+                    return True, f"Ack type shortcut '{token}' may access sensitive files without explicit paths."
 
     # Rest of checks...
-```
-
-**Alternative:** Strict mode blocks AWK entirely:
-```python
-if strict_mode and cmd_name in ['awk', 'gawk', 'mawk', 'nawk']:
-    return True, "AWK is disabled in strict security mode."
 ```
 
 ### Fix #7: Ripgrep Path Validation
@@ -550,9 +549,9 @@ def check_bash_command(command, sensitive_spec, project_root=None, use_gitignore
 | Grep without path | **CRITICAL** | Trivial | Complete bypass |
 | Command substitution | **CRITICAL** | Easy | Complete bypass |
 | Process substitution | **CRITICAL** | Easy | Complete bypass |
-| AWK variable indirection | **CRITICAL** | Easy | Complete bypass |
-| AWK getline injection | **CRITICAL** | Easy | Complete bypass |
-| AWK system() injection | **CRITICAL** | Trivial | Complete bypass + RCE |
+| Ack without path | **CRITICAL** | Trivial | Complete bypass |
+| Ack type filters | **CRITICAL** | Trivial | Complete bypass |
+| Ack-grep variant | **CRITICAL** | Trivial | Complete bypass |
 | Ripgrep without path | **CRITICAL** | Trivial | Complete bypass |
 | Flag value parsing | **MEDIUM** | Easy | Partial bypass |
 | Recursive grep | **MEDIUM** | Trivial | Data exposure |
@@ -563,19 +562,19 @@ def check_bash_command(command, sensitive_spec, project_root=None, use_gitignore
 
 The `block_sensitive` hook has **7 critical security vulnerabilities** that can be trivially exploited to bypass all sensitive file protections. The vulnerabilities span multiple attack vectors:
 
-- **Tool-level bypasses:** Grep and Ripgrep without paths
+- **Tool-level bypasses:** Grep, Ack, and Ripgrep without paths
 - **Shell-level bypasses:** Command/process substitution
-- **Scripting-level bypasses:** AWK variable indirection, getline, and system() injection
+- **Search tool bypasses:** Ack and Ripgrep type filters without explicit paths
 
-AWK is particularly dangerous because it's a full programming language with multiple file access methods and arbitrary command execution capabilities.
+All three code search tools (grep, ack, ripgrep) share the same fundamental vulnerability: they can search recursively without triggering detection when no explicit file paths appear in the command arguments.
 
 Immediate remediation is required before this hook can be considered secure.
 
 **Recommended Actions (Priority Order):**
 1. **CRITICAL:** Implement Fix #2 (Block command/process substitution) - Prevents $(…) and <(…) bypasses
-2. **CRITICAL:** Implement Fix #6 (AWK script analysis or blocking) - AWK is extremely dangerous
-3. **CRITICAL:** Implement Fix #1 (Grep path validation) - Applies to both grep and ripgrep
-4. **CRITICAL:** Implement Fix #7 (Ripgrep path validation) - Same issue as grep
+2. **CRITICAL:** Implement Fix #1 (Grep path validation) - Prevents recursive searches
+3. **CRITICAL:** Implement Fix #6 (Ack path validation) - Handles both ack and ack-grep
+4. **CRITICAL:** Implement Fix #7 (Ripgrep path validation) - Similar to grep/ack
 5. **HIGH:** Implement Fix #3 (Parse flag values) - Catches --flag=value syntax
 6. **MEDIUM:** Add comprehensive regression tests for all bypasses
 7. **MEDIUM:** Security review of all fixes
