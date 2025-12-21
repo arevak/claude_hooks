@@ -321,6 +321,219 @@ if strict_mode:
 
 ---
 
+## 🔴 CRITICAL: Vulnerability #4 - AWK Script Injection & File Indirection
+
+**Location:** `src/claude_hooks/block_sensitive.py:134-192`
+
+**Issue:** AWK is an extremely powerful scripting language with multiple methods to access files that are invisible to token-based parsing. The hook only checks command-line arguments, not AWK script content.
+
+### AWK Bypass Methods
+
+#### 4a. Variable Indirection
+```bash
+awk -v file=.env '{getline < file; print}' /dev/null
+```
+**Why it bypasses:** The filename `.env` is assigned to a variable, not a command-line token. The hook sees `file=.env` and skips it because it contains `=`.
+
+**Proof:**
+```
+TEST 8: awk with -v variable assignment
+Command: awk -v file=.env "{getline < file; print}" /dev/null
+Blocked: False
+❌ VULNERABILITY: awk with variable indirection bypasses!
+```
+
+#### 4b. Inline File Reading (getline)
+```bash
+awk 'BEGIN {while(getline < ".env") print}'
+```
+**Why it bypasses:** The filename is embedded inside the AWK script string, completely invisible to external tokenization.
+
+**Proof:**
+```
+TEST 9: awk reading file in script
+Command: awk "BEGIN {while(getline < ".env") print}"
+Blocked: False
+❌ VULNERABILITY: awk inline file reading bypasses!
+```
+
+#### 4c. System Command Injection
+```bash
+awk 'BEGIN {system("cat .env")}'
+awk 'BEGIN {system("find . -name *.tfvars | xargs cat")}'
+```
+**Why it bypasses:** AWK's `system()` function executes arbitrary shell commands. The nested command is invisible to the hook.
+
+**Proof:**
+```
+TEST 10: awk system() command injection
+Command: awk "BEGIN {system("cat .env")}"
+Blocked: False
+❌ VULNERABILITY: awk system() command injection!
+```
+
+**Impact:** AWK provides multiple independent bypass mechanisms. An attacker can read any sensitive file using AWK scripting features.
+
+**Additional AWK Attack Vectors:**
+```bash
+# Print specific fields from sensitive files
+awk -F'=' '/PASSWORD/ {print $2}' .env
+
+# Read multiple sensitive files in one command
+awk 'FNR==1{print FILENAME":"$0}' .env config.yml secrets.json
+
+# Use AWK as a full programming language to exfiltrate data
+awk 'BEGIN {
+  while((getline line < ".env") > 0)
+    print line | "base64"
+}'
+```
+
+---
+
+## 🔴 CRITICAL: Vulnerability #5 - Ripgrep Without Path
+
+**Location:** `src/claude_hooks/block_sensitive.py:134-192` (Bash command checking)
+
+**Issue:** Same as Grep vulnerability - ripgrep (rg) without a path searches recursively from the current directory, but the hook doesn't detect this unless sensitive filenames appear in the arguments.
+
+**Exploit:**
+```bash
+rg "password" --type yaml
+rg "API_KEY" --type env
+rg "secret" --iglob "!node_modules/*"
+```
+
+**Proof:**
+```
+TEST 2: rg recursive without path
+Command: rg "password" --type yaml
+Blocked: False
+❌ VULNERABILITY: ripgrep searches all files!
+```
+
+**Why it bypasses:** The command contains no explicit file paths in tokens - just `--type yaml` which doesn't look like a file. Ripgrep searches all YAML files recursively by default.
+
+**Impact:** Ripgrep is faster than grep and commonly used. This bypass allows searching all files matching a type without detection.
+
+**Additional Ripgrep Bypasses:**
+```bash
+# Search with file type filters
+rg "SECRET_KEY" --type-add 'custom:*.{env,tfvars}' --type custom
+
+# Search with complex globs
+rg "password" --glob "**/*.{yml,yaml,json}" --glob "!**/node_modules/**"
+
+# Output only matching content, no filenames
+rg "API_KEY" --no-filename --no-line-number
+```
+
+---
+
+## Updated Attack Scenarios
+
+### Scenario 4: AWK-Based Data Exfiltration
+```bash
+# Extract all environment variables
+awk 'BEGIN {while(getline < ".env") print}' | base64
+
+# Parse and extract specific secrets
+awk -F'=' '/PASSWORD|SECRET|KEY/ {print $2}' .env secrets.yml
+
+# Use system() to chain multiple commands
+awk 'BEGIN {system("find . -name *.tfvars -exec cat {} \\;")}'
+
+# Read file via variable indirection to evade detection
+awk -v f=terraform.tfvars 'BEGIN {while(getline < f) print}'
+```
+
+### Scenario 5: Ripgrep Reconnaissance
+```bash
+# Find all potential secret files without specifying paths
+rg "password|secret|key" --type yaml --type json
+
+# Search for AWS keys across entire codebase
+rg "AKIA[0-9A-Z]{16}" --no-filename
+
+# Search with type definitions that avoid detection
+rg "secret" --type-add 'secrets:*.{env,tfvars,yml}' --type secrets
+```
+
+---
+
+## Additional Recommended Fixes
+
+### Fix #6: AWK Script Analysis (CRITICAL)
+
+**Location:** `src/claude_hooks/block_sensitive.py:134-192`
+
+AWK is too dangerous to parse safely. Recommended approach: **Block AWK entirely** or implement strict allowlist mode.
+
+```python
+def check_bash_command(command, sensitive_spec, project_root=None, use_gitignore=False):
+    if not command:
+        return False, None
+
+    # CRITICAL: Block AWK entirely for high-security environments
+    # AWK has too many ways to access files: getline, system(), variable indirection
+    tokens = shlex.split(command) if command else []
+    cmd_name = tokens[0] if tokens else ''
+
+    if cmd_name in ['awk', 'gawk', 'mawk', 'nawk']:
+        # Check if AWK script contains dangerous constructs
+        if 'getline' in command or 'system(' in command:
+            return True, "AWK scripts with 'getline' or 'system()' are not allowed for security reasons."
+
+        # Parse -v variable assignments
+        for i, token in enumerate(tokens):
+            if token == '-v' and i + 1 < len(tokens):
+                # Extract variable assignment: -v file=.env
+                assignment = tokens[i + 1]
+                if '=' in assignment:
+                    _, value = assignment.split('=', 1)
+                    is_sensitive, reason = is_sensitive_file(value, sensitive_spec, project_root, use_gitignore)
+                    if is_sensitive:
+                        return True, f"AWK variable references sensitive file: {value}"
+
+    # Rest of checks...
+```
+
+**Alternative:** Strict mode blocks AWK entirely:
+```python
+if strict_mode and cmd_name in ['awk', 'gawk', 'mawk', 'nawk']:
+    return True, "AWK is disabled in strict security mode."
+```
+
+### Fix #7: Ripgrep Path Validation
+
+**Location:** `src/claude_hooks/block_sensitive.py:134-192`
+
+```python
+def check_bash_command(command, sensitive_spec, project_root=None, use_gitignore=False):
+    # ...
+
+    cmd_name = tokens[0] if tokens else ''
+
+    if cmd_name in ['rg', 'ripgrep']:
+        # Check if ripgrep has explicit paths or searches from root
+        has_path = any(not token.startswith('-') and '/' in token for token in tokens[1:])
+
+        if not has_path:
+            # Searching without explicit path - potentially dangerous
+            return True, "Ripgrep without explicit path is not allowed. Specify a safe directory to search."
+
+        # Check --type and --glob flags for sensitive patterns
+        for i, token in enumerate(tokens):
+            if token in ['--type', '-t', '--glob', '-g'] and i + 1 < len(tokens):
+                pattern = tokens[i + 1]
+                if matches_pattern(pattern, sensitive_spec):
+                    return True, f"Ripgrep pattern '{pattern}' matches sensitive files"
+
+    # Rest of checks...
+```
+
+---
+
 ## Testing Recommendations
 
 1. **Add regression tests** for all bypass scenarios
@@ -337,6 +550,10 @@ if strict_mode:
 | Grep without path | **CRITICAL** | Trivial | Complete bypass |
 | Command substitution | **CRITICAL** | Easy | Complete bypass |
 | Process substitution | **CRITICAL** | Easy | Complete bypass |
+| AWK variable indirection | **CRITICAL** | Easy | Complete bypass |
+| AWK getline injection | **CRITICAL** | Easy | Complete bypass |
+| AWK system() injection | **CRITICAL** | Trivial | Complete bypass + RCE |
+| Ripgrep without path | **CRITICAL** | Trivial | Complete bypass |
 | Flag value parsing | **MEDIUM** | Easy | Partial bypass |
 | Recursive grep | **MEDIUM** | Trivial | Data exposure |
 
@@ -344,14 +561,25 @@ if strict_mode:
 
 ## Conclusion
 
-The `block_sensitive` hook has **critical security vulnerabilities** that can be trivially exploited to bypass all sensitive file protections. Immediate remediation is required before this hook can be considered secure.
+The `block_sensitive` hook has **7 critical security vulnerabilities** that can be trivially exploited to bypass all sensitive file protections. The vulnerabilities span multiple attack vectors:
 
-**Recommended Action:**
-1. Implement Fix #1 (Grep validation) - CRITICAL
-2. Implement Fix #2 (Block substitution) - CRITICAL
-3. Add comprehensive test coverage
-4. Security review of all fixes
-5. Document secure usage patterns
+- **Tool-level bypasses:** Grep and Ripgrep without paths
+- **Shell-level bypasses:** Command/process substitution
+- **Scripting-level bypasses:** AWK variable indirection, getline, and system() injection
+
+AWK is particularly dangerous because it's a full programming language with multiple file access methods and arbitrary command execution capabilities.
+
+Immediate remediation is required before this hook can be considered secure.
+
+**Recommended Actions (Priority Order):**
+1. **CRITICAL:** Implement Fix #2 (Block command/process substitution) - Prevents $(…) and <(…) bypasses
+2. **CRITICAL:** Implement Fix #6 (AWK script analysis or blocking) - AWK is extremely dangerous
+3. **CRITICAL:** Implement Fix #1 (Grep path validation) - Applies to both grep and ripgrep
+4. **CRITICAL:** Implement Fix #7 (Ripgrep path validation) - Same issue as grep
+5. **HIGH:** Implement Fix #3 (Parse flag values) - Catches --flag=value syntax
+6. **MEDIUM:** Add comprehensive regression tests for all bypasses
+7. **MEDIUM:** Security review of all fixes
+8. **LOW:** Consider strict allowlist mode (Fix #5) for high-security environments
 
 ---
 

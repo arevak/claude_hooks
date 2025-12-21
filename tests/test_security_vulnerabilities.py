@@ -208,14 +208,151 @@ class TestBashFindGrepVulnerabilities:
         # Note: This is actually legitimate terraform usage, so it's a balance
 
 
+class TestRipgrepVulnerabilities:
+    """Test vulnerabilities in ripgrep (rg) command handling."""
+
+    def test_ripgrep_without_path_bypasses(self, tmp_path):
+        """
+        VULNERABILITY: Ripgrep without path parameter searches recursively.
+        rg "password" --type yaml
+        """
+        import pathspec
+        spec = pathspec.PathSpec.from_lines('gitwildmatch', ['*.env', 'secrets/'])
+
+        data = {
+            'hook_event_name': 'PreToolUse',
+            'tool_name': 'Bash',
+            'tool_input': {
+                'command': 'rg "password" --type yaml'
+            }
+        }
+
+        should_block, message = process_tool_input(data, spec, tmp_path, use_gitignore=False)
+
+        assert should_block is False
+        print("❌ VULNERABILITY CONFIRMED: ripgrep without path bypasses detection")
+
+    def test_ripgrep_with_type_filter_bypasses(self, tmp_path):
+        """
+        VULNERABILITY: Ripgrep with type filters searches all matching files.
+        rg "API_KEY" --type env
+        """
+        import pathspec
+        spec = pathspec.PathSpec.from_lines('gitwildmatch', ['*.env'])
+
+        data = {
+            'hook_event_name': 'PreToolUse',
+            'tool_name': 'Bash',
+            'tool_input': {
+                'command': 'rg "API_KEY" --type-add "custom:*.env" --type custom'
+            }
+        }
+
+        should_block, message = process_tool_input(data, spec, tmp_path, use_gitignore=False)
+
+        print(f"Result: block={should_block}, message={message}")
+        if not should_block:
+            print("❌ VULNERABILITY: ripgrep with custom type bypasses detection")
+
+
+class TestAwkVulnerabilities:
+    """Test vulnerabilities in AWK command handling."""
+
+    def test_awk_variable_indirection_bypasses(self, tmp_path):
+        """
+        VULNERABILITY: AWK -v variable assignment bypasses detection.
+        awk -v file=.env '{getline < file; print}' /dev/null
+        """
+        import pathspec
+        spec = pathspec.PathSpec.from_lines('gitwildmatch', ['*.env'])
+
+        data = {
+            'hook_event_name': 'PreToolUse',
+            'tool_name': 'Bash',
+            'tool_input': {
+                'command': 'awk -v file=.env \'{getline < file; print}\' /dev/null'
+            }
+        }
+
+        should_block, message = process_tool_input(data, spec, tmp_path, use_gitignore=False)
+
+        assert should_block is False
+        print("❌ VULNERABILITY CONFIRMED: AWK variable indirection bypasses detection")
+
+    def test_awk_getline_inline_bypasses(self, tmp_path):
+        """
+        VULNERABILITY: AWK getline with inline filename bypasses detection.
+        awk 'BEGIN {while(getline < ".env") print}'
+        """
+        import pathspec
+        spec = pathspec.PathSpec.from_lines('gitwildmatch', ['*.env'])
+
+        data = {
+            'hook_event_name': 'PreToolUse',
+            'tool_name': 'Bash',
+            'tool_input': {
+                'command': 'awk \'BEGIN {while(getline < ".env") print}\''
+            }
+        }
+
+        should_block, message = process_tool_input(data, spec, tmp_path, use_gitignore=False)
+
+        assert should_block is False
+        print("❌ VULNERABILITY CONFIRMED: AWK inline getline bypasses detection")
+
+    def test_awk_system_command_injection_bypasses(self, tmp_path):
+        """
+        VULNERABILITY: AWK system() executes arbitrary commands.
+        awk 'BEGIN {system("cat .env")}'
+        """
+        import pathspec
+        spec = pathspec.PathSpec.from_lines('gitwildmatch', ['*.env'])
+
+        data = {
+            'hook_event_name': 'PreToolUse',
+            'tool_name': 'Bash',
+            'tool_input': {
+                'command': 'awk \'BEGIN {system("cat .env")}\''
+            }
+        }
+
+        should_block, message = process_tool_input(data, spec, tmp_path, use_gitignore=False)
+
+        assert should_block is False
+        print("❌ VULNERABILITY CONFIRMED: AWK system() command injection bypasses detection")
+
+    def test_awk_nested_find_bypasses(self, tmp_path):
+        """
+        VULNERABILITY: AWK system() with nested find command.
+        awk 'BEGIN {system("find . -name *.tfvars | xargs cat")}'
+        """
+        import pathspec
+        spec = pathspec.PathSpec.from_lines('gitwildmatch', ['*.tfvars'])
+
+        data = {
+            'hook_event_name': 'PreToolUse',
+            'tool_name': 'Bash',
+            'tool_input': {
+                'command': 'awk \'BEGIN {system("find . -name *.tfvars | xargs cat")}\''
+            }
+        }
+
+        should_block, message = process_tool_input(data, spec, tmp_path, use_gitignore=False)
+
+        print(f"Result: block={should_block}, message={message}")
+        if not should_block:
+            print("❌ VULNERABILITY: AWK with nested find command bypasses detection")
+
+
 class TestRecommendedFixes:
     """
     Recommended fixes for these vulnerabilities:
 
-    1. GREP TOOL:
+    1. GREP/RIPGREP TOOL:
        - Check if 'path' is empty/missing and default to '.'
-       - Block Grep operations when path would expose sensitive directories
-       - Consider blocking recursive grep without explicit safe paths
+       - Block Grep/Ripgrep operations when path would expose sensitive directories
+       - Consider blocking recursive grep/rg without explicit safe paths
+       - Validate ripgrep --type and --glob flags against sensitive patterns
 
     2. BASH COMMAND:
        - Detect pipe operators and flag risky combinations (find | xargs)
@@ -225,11 +362,25 @@ class TestRecommendedFixes:
        - Parse --flag=value syntax to extract values
        - Use AST parsing instead of simple tokenization
 
-    3. GENERAL:
+    3. AWK SECURITY:
+       - Detect and block 'getline' in AWK scripts (file access)
+       - Detect and block 'system(' in AWK scripts (command execution)
+       - Parse -v variable assignments and check values
+       - Consider blocking AWK entirely in strict mode (too dangerous)
+       - AWK variants: awk, gawk, mawk, nawk all need checking
+
+    4. RIPGREP SECURITY:
+       - Block ripgrep without explicit safe paths
+       - Parse --type-add definitions and check patterns
+       - Validate --glob patterns against sensitive files
+       - Handle ripgrep's default recursive behavior
+
+    5. GENERAL:
        - Add explicit allowlist mode for highly sensitive environments
        - Log all attempted accesses for audit trail
        - Consider blocking certain command combinations entirely
        - Add pattern detection for find commands specifically
+       - Implement defense-in-depth with multiple validation layers
     """
     pass
 
