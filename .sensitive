@@ -1,47 +1,131 @@
 # .sensitive - Define patterns for files that should be blocked by Claude Code hooks
-# This file uses gitignore-style glob patterns
+# This file uses full gitignore-style glob patterns with advanced features
 # Lines starting with # are comments and will be ignored
 
-# Default Terraform sensitive files
-terraform.tfvars
-terraform.tfvars.json
-*.auto.tfvars
-*.auto.tfvars.json
+# ============================================================================
+# TERRAFORM SENSITIVE FILES
+# ============================================================================
+# Block all tfvars files (terraform variables)
+*.tfvars
+*.tfvars.json
 
-# Environment files (common patterns)
-.env
-.env.*
+# Allow example files (negation pattern)
+!example.tfvars
+!example.tfvars.json
+
+# Block all production environments (globstar pattern)
+**/environments/prod/**
+**/environments/production/**
+
+# But allow README files in production environments
+!**/environments/prod/README.md
+!**/environments/production/README.md
+
+# ============================================================================
+# ENVIRONMENT FILES
+# ============================================================================
+# Block all environment files
+.env*
 *.env
 
-# Common secret/config files
-secrets.json
-secrets.yaml
-secrets.yml
-config/production.*
-config/prod.*
+# Allow example and template files
+!.env.example
+!.env.template
+!.env.sample
 
-# SSH and crypto keys
-*.pem
-*.key
-id_rsa
-id_dsa
-id_ecdsa
-id_ed25519
-*.p12
-*.pfx
+# ============================================================================
+# SECRET & CONFIGURATION FILES
+# ============================================================================
+# Block secrets at any depth (globstar)
+**/secrets.json
+**/secrets.yaml
+**/secrets.yml
 
-# Database connection files
-.pgpass
-my.cnf
+# Block production config files at root only (root-relative)
+/config/production.*
+/config/prod.*
 
-# Cloud provider credentials
-.aws/credentials
-.aws/config
-gcloud/credentials.json
-.azure/credentials
+# Block nested production configs anywhere
+**/config/**/production.*
+**/config/**/prod.*
 
-# API keys and tokens
-*api-key*
-*api_key*
-*token*
-*secret*
+# ============================================================================
+# SSH & CRYPTOGRAPHIC KEYS
+# ============================================================================
+# Block all key files anywhere in project
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+
+# Specific SSH key files
+**/id_rsa
+**/id_dsa
+**/id_ecdsa
+**/id_ed25519
+**/.ssh/*.key
+
+# ============================================================================
+# DATABASE CONNECTION FILES
+# ============================================================================
+**/.pgpass
+**/my.cnf
+**/.my.cnf
+**/database.yml
+**/database.yaml
+
+# ============================================================================
+# CLOUD PROVIDER CREDENTIALS
+# ============================================================================
+# AWS credentials
+**/.aws/credentials
+**/.aws/config
+
+# Google Cloud
+**/gcloud/credentials.json
+**/.gcloud/**/*.json
+
+# Azure
+**/.azure/credentials
+**/.azure/**/*.pem
+
+# ============================================================================
+# API KEYS & TOKENS
+# ============================================================================
+# Match files with sensitive keywords (case-insensitive)
+**/*api-key*
+**/*api_key*
+**/*apikey*
+**/*token*
+**/*secret*
+**/*password*
+**/*credential*
+
+# Allow documentation and examples
+!**/*example*
+!**/*sample*
+!**/*template*
+!**/*README*
+
+# ============================================================================
+# CERTIFICATES & KEYSTORES
+# ============================================================================
+**/*.keystore
+**/*.jks
+**/*.pkcs12
+**/truststore.*
+
+# ============================================================================
+# MISCELLANEOUS SENSITIVE FILES
+# ============================================================================
+# Docker secrets
+**/secrets/**
+!**/secrets/README.md
+
+# Kubernetes secrets
+**/k8s/**/secrets/**
+**/kubernetes/**/secrets/**
+
+# CI/CD secrets
+**/.gitlab-ci-secrets.yml
+**/.github/secrets/**

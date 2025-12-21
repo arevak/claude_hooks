@@ -83,9 +83,9 @@ class TestBlockSensitiveEnhanced:
         self.create_sensitive_file([
             "*.env",
             "secrets.json",
-            "config/production.yaml"
+            "**/config/production.yaml"  # Use globstar to match at any depth
         ])
-        
+
         self.run_hook("Read", {"file_path": "/project/.env"}, 2)
         self.run_hook("Read", {"file_path": "/project/dev.env"}, 2)
         self.run_hook("Read", {"file_path": "/project/secrets.json"}, 2)
@@ -204,12 +204,12 @@ class TestBlockSensitiveEnhanced:
         self.run_hook("Read", {"file_path": "/project/production.ENV"}, 2)
 
     def test_path_component_matching(self):
-        """Should match against path components correctly."""
+        """Should match against path components correctly using globstar patterns."""
         self.create_sensitive_file([
-            "secrets/*",
-            "*/production.yaml"
+            "**/secrets/*",       # Match secrets directory anywhere
+            "**/production.yaml"  # Match production.yaml anywhere
         ])
-        
+
         self.run_hook("Read", {"file_path": "/project/secrets/api-keys.txt"}, 2)
         self.run_hook("Read", {"file_path": "/project/config/production.yaml"}, 2)
         self.run_hook("Read", {"file_path": "/project/config/development.yaml"}, 0)
